@@ -284,6 +284,58 @@ func (jc *jobCache) TaskCompleted(jobKey, taskName string) bool {
 	return completed >= taskReplicas
 }
 
+func (jc *jobCache) TaskFailed(jobKey, taskName string) bool {
+	jc.Lock()
+	defer jc.Unlock()
+
+	var taskReplicas, retried, maxRetry int32
+
+	jobInfo, found := jc.jobs[jobKey]
+	if !found {
+		return false
+	}
+
+	taskPods, found := jobInfo.Pods[taskName]
+
+	if !found {
+		return false
+	}
+
+	if jobInfo.Job == nil {
+		return false
+	}
+
+	for _, task := range jobInfo.Job.Spec.Tasks {
+		if task.Name == taskName {
+			maxRetry = task.MaxRetry
+			taskReplicas = task.Replicas
+			break
+		}
+	}
+	if taskReplicas <= 0 {
+		return false
+	}
+
+	// Compatible with existing job
+	if maxRetry == 0 {
+		maxRetry = 3
+	}
+
+	for _, pod := range taskPods {
+		if pod.Status.Phase == v1.PodRunning || pod.Status.Phase == v1.PodPending {
+			for j := range pod.Status.InitContainerStatuses {
+				stat := pod.Status.InitContainerStatuses[j]
+				retried += stat.RestartCount
+			}
+			for j := range pod.Status.ContainerStatuses {
+				stat := pod.Status.ContainerStatuses[j]
+				retried += stat.RestartCount
+			}
+		}
+	}
+	return retried >= maxRetry
+}
+
 func (jc *jobCache) worker() {
 	for jc.processCleanupJob() {
 	}
