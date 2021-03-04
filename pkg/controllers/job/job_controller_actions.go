@@ -19,6 +19,7 @@ package job
 import (
 	"context"
 	"fmt"
+	"reflect"
 	"sort"
 	"sync"
 	"sync/atomic"
@@ -27,7 +28,10 @@ import (
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
+	"k8s.io/apimachinery/pkg/util/clock"
 	"k8s.io/klog"
+	"k8s.io/kubernetes/pkg/quota/v1"
+	quotacore "k8s.io/kubernetes/pkg/quota/v1/evaluator/core"
 
 	batch "volcano.sh/volcano/pkg/apis/batch/v1alpha1"
 	"volcano.sh/volcano/pkg/apis/helpers"
@@ -502,6 +506,7 @@ func (cc *jobcontroller) createOrUpdatePodGroup(job *batch.Job) error {
 				MinMember:         job.Spec.MinAvailable,
 				Queue:             job.Spec.Queue,
 				MinResources:      cc.calcPGMinResources(job),
+				MinQuotas:         cc.calcPGMinQuota(job),
 				PriorityClassName: job.Spec.PriorityClassName,
 			},
 		}
@@ -516,9 +521,15 @@ func (cc *jobcontroller) createOrUpdatePodGroup(job *batch.Job) error {
 		return nil
 	}
 
-	if pg.Spec.MinMember != job.Spec.MinAvailable {
+	minResources := cc.calcPGMinResources(job)
+	minQuotas := cc.calcPGMinQuota(job)
+	if pg.Spec.MinMember != job.Spec.MinAvailable ||
+		!reflect.DeepEqual(pg.Spec.MinResources, minResources) ||
+		!reflect.DeepEqual(pg.Spec.MinQuotas, minQuotas) {
+
 		pg.Spec.MinMember = job.Spec.MinAvailable
-		pg.Spec.MinResources = cc.calcPGMinResources(job)
+		pg.Spec.MinResources = minResources
+		pg.Spec.MinQuotas = minQuotas
 		if _, err = cc.vcClient.SchedulingV1beta1().PodGroups(job.Namespace).Update(context.TODO(), pg, metav1.UpdateOptions{}); err != nil {
 			if !apierrors.IsAlreadyExists(err) {
 				klog.Errorf("Failed to update PodGroup for Job <%s/%s>: %v",
@@ -577,6 +588,40 @@ func (cc *jobcontroller) calcPGMinResources(job *batch.Job) *v1.ResourceList {
 	}
 
 	return &minAvailableTasksRes
+}
+
+func (cc *jobcontroller) calcPGMinQuota(job *batch.Job) *v1.ResourceList {
+	// sort task by priorityClasses
+	var tasksPriority TasksPriority
+	for index := range job.Spec.Tasks {
+		tp := TaskPriority{0, job.Spec.Tasks[index]}
+		pc := job.Spec.Tasks[index].Template.Spec.PriorityClassName
+		if len(cc.priorityClasses) != 0 && cc.priorityClasses[pc] != nil {
+			tp.priority = cc.priorityClasses[pc].Value
+		}
+		tasksPriority = append(tasksPriority, tp)
+	}
+
+	sort.Sort(tasksPriority)
+
+	minQuota := v1.ResourceList{}
+	podCnt := int32(0)
+	for _, task := range tasksPriority {
+		for i := int32(0); i < task.Replicas; i++ {
+			if podCnt >= job.Spec.MinAvailable {
+				break
+			}
+
+			podCnt++
+			pod := &v1.Pod{
+				Spec: task.Template.Spec,
+			}
+			res, _ := quotacore.PodUsageFunc(pod, clock.RealClock{})
+			minQuota = quota.Add(minQuota, res)
+		}
+	}
+
+	return &minQuota
 }
 
 func (cc *jobcontroller) initJobStatus(job *batch.Job) (*batch.Job, error) {

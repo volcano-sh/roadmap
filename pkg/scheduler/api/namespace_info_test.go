@@ -51,7 +51,7 @@ func TestNamespaceCollection(t *testing.T) {
 
 	info := c.Snapshot()
 	if info.Weight != 456 {
-		t.Errorf("weight of namespace should be %d, but not %d", 456, info.Weight)
+		t.Errorf("weight of namespace should be %d, but got %d", 456, info.Weight)
 	}
 
 	c.Delete(newQuota("abc", 0))
@@ -59,6 +59,9 @@ func TestNamespaceCollection(t *testing.T) {
 	info = c.Snapshot()
 	if info.Weight != 16 {
 		t.Errorf("weight of namespace should be %d, but not %d", 16, info.Weight)
+	}
+	if _, ok := info.RQStatus["abc"]; ok {
+		t.Errorf("RQStatus abc of namespace should not exist")
 	}
 
 	c.Delete(newQuota("abc", 0))
