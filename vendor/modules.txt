@@ -378,8 +378,16 @@ k8s.io/apimachinery/third_party/forked/golang/json
 k8s.io/apimachinery/third_party/forked/golang/reflect
 # k8s.io/apiserver v0.18.3 => k8s.io/apiserver v0.18.3
 ## explicit
+k8s.io/apiserver/pkg/admission
+k8s.io/apiserver/pkg/apis/apiserver
+k8s.io/apiserver/pkg/apis/apiserver/v1
 k8s.io/apiserver/pkg/apis/audit
+k8s.io/apiserver/pkg/apis/audit/v1
+k8s.io/apiserver/pkg/apis/audit/v1alpha1
+k8s.io/apiserver/pkg/apis/audit/v1beta1
+k8s.io/apiserver/pkg/audit
 k8s.io/apiserver/pkg/authentication/user
+k8s.io/apiserver/pkg/authorization/authorizer
 k8s.io/apiserver/pkg/endpoints/metrics
 k8s.io/apiserver/pkg/endpoints/request
 k8s.io/apiserver/pkg/features
@@ -636,6 +644,7 @@ k8s.io/kubernetes/pkg/apis/core/helper
 k8s.io/kubernetes/pkg/apis/core/pods
 k8s.io/kubernetes/pkg/apis/core/v1
 k8s.io/kubernetes/pkg/apis/core/v1/helper
+k8s.io/kubernetes/pkg/apis/core/v1/helper/qos
 k8s.io/kubernetes/pkg/apis/core/validation
 k8s.io/kubernetes/pkg/apis/scheduling
 k8s.io/kubernetes/pkg/capabilities
@@ -646,6 +655,9 @@ k8s.io/kubernetes/pkg/features
 k8s.io/kubernetes/pkg/fieldpath
 k8s.io/kubernetes/pkg/kubelet/types
 k8s.io/kubernetes/pkg/master/ports
+k8s.io/kubernetes/pkg/quota/v1
+k8s.io/kubernetes/pkg/quota/v1/evaluator/core
+k8s.io/kubernetes/pkg/quota/v1/generic
 k8s.io/kubernetes/pkg/scheduler/apis/config
 k8s.io/kubernetes/pkg/scheduler/framework/plugins/helper
 k8s.io/kubernetes/pkg/scheduler/framework/plugins/interpodaffinity
