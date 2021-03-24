@@ -24,10 +24,14 @@ import (
 	"k8s.io/apimachinery/pkg/types"
 	"k8s.io/apimachinery/pkg/util/uuid"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 	"k8s.io/klog"
 
 	"volcano.sh/volcano/pkg/apis/scheduling"
+	schedulingscheme "volcano.sh/volcano/pkg/apis/scheduling/scheme"
+	vcv1beta1 "volcano.sh/volcano/pkg/apis/scheduling/v1beta1"
 	"volcano.sh/volcano/pkg/scheduler/api"
+	schedulingapi "volcano.sh/volcano/pkg/scheduler/api"
 	"volcano.sh/volcano/pkg/scheduler/cache"
 	"volcano.sh/volcano/pkg/scheduler/conf"
 	"volcano.sh/volcano/pkg/scheduler/metrics"
@@ -38,6 +42,7 @@ type Session struct {
 	UID types.UID
 
 	kubeClient kubernetes.Interface
+	recorder   record.EventRecorder
 	cache      cache.Cache
 
 	// podGroupStatus cache podgroup status during schedule
@@ -82,6 +87,7 @@ func openSession(cache cache.Cache) *Session {
 	ssn := &Session{
 		UID:        uuid.NewUUID(),
 		kubeClient: cache.Client(),
+		recorder:   cache.EventRecorder(),
 		cache:      cache,
 
 		podGroupStatus: map[api.JobID]scheduling.PodGroupStatus{},
@@ -418,6 +424,20 @@ func (ssn *Session) AddEventHandler(eh *EventHandler) {
 // KubeClient returns the kubernetes client
 func (ssn Session) KubeClient() kubernetes.Interface {
 	return ssn.kubeClient
+}
+
+// RecordPodGroupEvent records podGroup events
+func (ssn Session) RecordPodGroupEvent(podGroup *schedulingapi.PodGroup, eventType, reason, msg string) {
+	if podGroup == nil {
+		return
+	}
+
+	pg := &vcv1beta1.PodGroup{}
+	if err := schedulingscheme.Scheme.Convert(&podGroup.PodGroup, pg, nil); err != nil {
+		klog.Errorf("Error while converting PodGroup to v1alpha1.PodGroup with error: %v", err)
+		return
+	}
+	ssn.recorder.Eventf(pg, eventType, reason, msg)
 }
 
 //String return nodes and jobs information in the session

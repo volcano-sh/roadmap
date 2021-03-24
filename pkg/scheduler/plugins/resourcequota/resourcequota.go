@@ -1,9 +1,13 @@
 package resourcequota
 
 import (
+	"fmt"
+
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 	"k8s.io/kubernetes/pkg/quota/v1"
 
+	"volcano.sh/volcano/pkg/apis/scheduling"
 	"volcano.sh/volcano/pkg/scheduler/api"
 	"volcano.sh/volcano/pkg/scheduler/framework"
 	"volcano.sh/volcano/pkg/scheduler/plugins/util"
@@ -50,13 +54,13 @@ func (rq *resourceQuotaPlugin) OnSessionOpen(ssn *framework.Session) {
 				failedRequestedUsage := quota.Mask(requestedUsage, exceeded)
 				failedUsed := quota.Mask(resourceQuota.Used, exceeded)
 				failedHard := quota.Mask(resourceQuota.Hard, exceeded)
-				klog.V(3).Infof("enqueueable false for job: %s/%s, because resource quota insufficient, requested: %v, used: %v, limited: %v",
-					job.Namespace,
-					job.Name,
+				msg := fmt.Sprintf("resource quota insufficient, requested: %v, used: %v, limited: %v",
 					failedRequestedUsage,
 					failedUsed,
 					failedHard,
 				)
+				klog.V(3).Infof("enqueueable false for job: %s/%s, because :%s", job.Namespace, job.Name, msg)
+				ssn.RecordPodGroupEvent(job.PodGroup, v1.EventTypeNormal, string(scheduling.PodGroupUnschedulableType), msg)
 				return util.Reject
 			}
 		}
