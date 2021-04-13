@@ -228,6 +228,10 @@ func TestSyncJobFunc(t *testing.T) {
 					Name:      "job1",
 					Namespace: namespace,
 				},
+				Spec: schedulingv1alpha2.PodGroupSpec{
+					MinResources: &v1.ResourceList{},
+					MinQuotas:    &v1.ResourceList{},
+				},
 				Status: schedulingv1alpha2.PodGroupStatus{
 					Phase: schedulingv1alpha2.PodGroupInqueue,
 				},

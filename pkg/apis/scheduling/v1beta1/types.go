@@ -183,6 +183,11 @@ type PodGroupSpec struct {
 	// if there's not enough resources to start all tasks, the scheduler
 	// will not start anyone.
 	MinResources *v1.ResourceList `json:"minResources,omitempty" protobuf:"bytes,4,opt,name=minResources"`
+
+	// MinQuotas defines the minimal resource quota of members/tasks to run the pod group;
+	// if there's not enough resources to start all tasks, the scheduler
+	// will not start anyone.
+	MinQuotas *v1.ResourceList `json:"minQuotas,omitempty" protobuf:"bytes,5,opt,name=minQuotas"`
 }
 
 // PodGroupStatus represents the current state of a pod group.

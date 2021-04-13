@@ -181,6 +181,11 @@ type PodGroupSpec struct {
 	// if there's not enough resources to start all tasks, the scheduler
 	// will not start anyone.
 	MinResources *v1.ResourceList
+
+	// MinQuotas defines the minimal resource quota of members/tasks to run the pod group;
+	// if there's not enough resources to start all tasks, the scheduler
+	// will not start anyone.
+	MinQuotas *v1.ResourceList
 }
 
 // PodGroupStatus represents the current state of a pod group.

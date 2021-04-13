@@ -46,6 +46,17 @@ spec:
                   tasks, the scheduler will not start anyone.
                 format: int32
                 type: integer
+              minQuotas:
+                additionalProperties:
+                  anyOf:
+                  - type: integer
+                  - type: string
+                  pattern: ^(\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))(([KMGTPE]i)|[numkMGTPE]|([eE](\+|-)?(([0-9]+(\.[0-9]*)?)|(\.[0-9]+))))?$
+                  x-kubernetes-int-or-string: true
+                description: MinQuotas defines the minimal resource quota of members/tasks
+                  to run the pod group; if there's not enough resources to start all
+                  tasks, the scheduler will not start anyone.
+                type: object
               minResources:
                 additionalProperties:
                   anyOf:

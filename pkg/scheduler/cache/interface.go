@@ -19,6 +19,7 @@ package cache
 import (
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/client-go/kubernetes"
+	"k8s.io/client-go/tools/record"
 
 	"volcano.sh/volcano/pkg/scheduler/api"
 )
@@ -57,6 +58,9 @@ type Cache interface {
 
 	// Client returns the kubernetes clientSet, which can be used by plugins
 	Client() kubernetes.Interface
+
+	// EventRecorder returns the event recorder
+	EventRecorder() record.EventRecorder
 }
 
 // VolumeBinder interface for allocate and bind volumes

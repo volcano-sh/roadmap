@@ -17,6 +17,7 @@ limitations under the License.
 package overcommit
 
 import (
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/klog"
 
 	"volcano.sh/volcano/pkg/apis/scheduling"
@@ -114,6 +115,7 @@ func (op *overcommitPlugin) OnSessionOpen(ssn *framework.Session) {
 		}
 		klog.V(4).Infof("Resource in cluster is overused, reject job <%s/%s> to be inqueue",
 			job.Namespace, job.Name)
+		ssn.RecordPodGroupEvent(job.PodGroup, v1.EventTypeNormal, string(scheduling.PodGroupUnschedulableType), "resource in cluster is overused")
 		return util.Reject
 	})
 }
