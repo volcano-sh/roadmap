@@ -18,6 +18,7 @@ package podgroup
 
 import (
 	"context"
+	"k8s.io/apimachinery/pkg/api/resource"
 
 	v1 "k8s.io/api/core/v1"
 	apierrors "k8s.io/apimachinery/pkg/api/errors"
@@ -73,14 +74,17 @@ func (pg *pgcontroller) updatePodAnnotations(pod *v1.Pod, pgName string) error {
 
 func (pg *pgcontroller) createNormalPodPGIfNotExist(pod *v1.Pod) error {
 	pgName := helpers.GeneratePodgroupName(pod)
-
+	podNum := int64(1)
+	replica, cpuReq, memReq := pg.GetMaxRequest(pod)
+	if replica != 1 {
+		podNum = replica
+	}
 	if _, err := pg.pgLister.PodGroups(pod.Namespace).Get(pgName); err != nil {
 		if !apierrors.IsNotFound(err) {
 			klog.Errorf("Failed to get normal PodGroup for Pod <%s/%s>: %v",
 				pod.Namespace, pod.Name, err)
 			return err
 		}
-
 		obj := &scheduling.PodGroup{
 			ObjectMeta: metav1.ObjectMeta{
 				Namespace:       pod.Namespace,
@@ -90,8 +94,15 @@ func (pg *pgcontroller) createNormalPodPGIfNotExist(pod *v1.Pod) error {
 				Labels:          map[string]string{},
 			},
 			Spec: scheduling.PodGroupSpec{
-				MinMember:         1,
+				MinMember:         int32(podNum),
 				PriorityClassName: pod.Spec.PriorityClassName,
+				MinResources: &v1.ResourceList{
+					v1.ResourceCPU:    *cpuReq,
+					v1.ResourceMemory: *memReq,
+				},
+			},
+			Status: scheduling.PodGroupStatus{
+				Phase: "Pending",
 			},
 		}
 		if queueName, ok := pod.Annotations[scheduling.QueueNameAnnotationKey]; ok {
@@ -120,7 +131,6 @@ func (pg *pgcontroller) createNormalPodPGIfNotExist(pod *v1.Pod) error {
 			return err
 		}
 	}
-
 	return pg.updatePodAnnotations(pod, pgName)
 }
 
@@ -140,4 +150,51 @@ func newPGOwnerReferences(pod *v1.Pod) []metav1.OwnerReference {
 	}
 	ref := metav1.NewControllerRef(pod, gvk)
 	return []metav1.OwnerReference{*ref}
+}
+
+func (pg *pgcontroller) GetMaxRequest(pod *v1.Pod) (int64, *resource.Quantity, *resource.Quantity) {
+	replica := int64(1)
+	initCPUReq := resource.NewQuantity(0, resource.DecimalSI)
+	initMemReq := resource.NewQuantity(0, resource.DecimalSI)
+
+	for _, container := range pod.Spec.InitContainers {
+		initCPUReq.Add(*container.Resources.Requests.Cpu())
+		initMemReq.Add(*container.Resources.Requests.Memory())
+	}
+
+	cpuReq := resource.NewQuantity(0, resource.DecimalSI)
+	memReq := resource.NewQuantity(0, resource.DecimalSI)
+
+	for _, container := range pod.Spec.Containers {
+		cpuReq.Add(*container.Resources.Requests.Cpu())
+		memReq.Add(*container.Resources.Requests.Memory())
+	}
+
+	if cpuReq.Cmp(*initCPUReq) < 0 {
+		cpuReq = initCPUReq
+	}
+
+	if memReq.Cmp(*initMemReq) < 0 {
+		memReq = initMemReq
+	}
+
+	if len(pod.OwnerReferences) != 0 {
+		for _, ownerReference := range pod.OwnerReferences {
+			if ownerReference.Controller != nil && *ownerReference.Controller && ownerReference.Kind == "ReplicaSet" {
+				rsName := ownerReference.Name
+				rs, err := pg.kubeClient.AppsV1().ReplicaSets(pod.Namespace).Get(context.TODO(), rsName, metav1.GetOptions{})
+				if err != nil {
+					klog.Errorf("Failed to get ReplicaSet for Pod <%s/%s>: %v",
+						pod.Namespace, pod.Name, err)
+					return replica, cpuReq, memReq
+				}
+
+				replica = int64(*rs.Spec.Replicas)
+				cpuReq.Set(cpuReq.Value() * replica)
+				memReq.Set(memReq.Value() * replica)
+			}
+		}
+	}
+
+	return replica, cpuReq, memReq
 }
