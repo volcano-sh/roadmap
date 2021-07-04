@@ -122,6 +122,10 @@ func (ni *NodeInfo) Ready() bool {
 }
 
 func (ni *NodeInfo) setRevocableZone(node *v1.Node) {
+	if node == nil {
+		return
+	}
+
 	revocableZone := ""
 	if len(node.Labels) > 0 {
 		if value, found := node.Labels[v1beta1.RevocableZone]; found {
