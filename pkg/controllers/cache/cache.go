@@ -23,7 +23,7 @@ import (
 
 	"golang.org/x/time/rate"
 
-	"k8s.io/api/core/v1"
+	v1 "k8s.io/api/core/v1"
 	"k8s.io/apimachinery/pkg/util/wait"
 	"k8s.io/client-go/util/workqueue"
 	"k8s.io/klog"
@@ -312,7 +312,7 @@ func (jc *jobCache) TaskFailed(jobKey, taskName string) bool {
 			break
 		}
 	}
-	if taskReplicas <= 0 {
+	if taskReplicas <= 0 || maxRetry == -1 {
 		return false
 	}
 
